@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ClipboardList, Dices, Globe, LogOut, User } from "lucide-react";
+import { ClipboardList, Dices, Globe, LogOut, User, UsersRound } from "lucide-react";
 import Logo from "./Logo";
 import { useAuth } from "@/lib/auth-context";
 
 const LINKS = [
   { href: "/research", label: "My Research", icon: Globe },
   { href: "/roll", label: "Roll", icon: Dices },
+  { href: "/community", label: "Community", icon: UsersRound },
   { href: "/tracker", label: "Tracker", icon: ClipboardList },
   { href: "/profile", label: "Profile", icon: User, mobileOnly: true },
 ];
