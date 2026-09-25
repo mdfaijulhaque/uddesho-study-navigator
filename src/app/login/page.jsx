@@ -29,7 +29,7 @@ const friendly = (code) => {
     case "auth/network-request-failed": return "Can't reach the network. Check your connection and try again.";
     case "auth/unauthorized-domain": return "This website address isn't authorised in Firebase yet. Add it under Authentication > Settings > Authorized domains.";
     case "auth/operation-not-allowed": return "This sign-in method isn't turned on in Firebase yet (Authentication > Sign-in method).";
-    default: return "Something went wrong. Please try again.";
+    default: return `Something went wrong: ${code || "unknown"}`;
   }
 };
 
