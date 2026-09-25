@@ -32,6 +32,16 @@ const YES_MAYBE_NO = [
   { value: "no", label: "No" },
 ];
 
+const ACADEMIC_LEVELS = [
+  { value: "secondary", label: "Secondary / SSC / O Level / Equivalent" },
+  { value: "higher_secondary", label: "Higher Secondary / HSC / A Level / Equivalent" },
+  { value: "diploma", label: "Diploma / Foundation" },
+  { value: "bachelor", label: "Bachelor's" },
+  { value: "master", label: "Master's" },
+  { value: "phd", label: "PhD / Doctorate" },
+  { value: "other", label: "Other" },
+];
+
 // Shrinks the picture to at most 512px before uploading, so it is fast on mobile data.
 async function resizeImage(file, max = 512) {
   const url = URL.createObjectURL(file);
@@ -70,8 +80,17 @@ function ProfileForm() {
     try { startName = sessionStorage.getItem("uddesho_new_name") || ""; } catch {}
     return {
       name: profile?.name || user?.displayName || startName,
-      sscGpa: profile?.academic?.sscGpa ?? "",
-      hscGpa: profile?.academic?.hscGpa ?? "",
+      academicRecords:
+        Array.isArray(profile?.academic?.records) && profile.academic.records.length
+          ? profile.academic.records
+          : [
+              ...(profile?.academic?.sscGpa
+                ? [{ level: "secondary", institution: "", result: String(profile.academic.sscGpa), scale: "5.00", passingYear: "" }]
+                : []),
+              ...(profile?.academic?.hscGpa
+                ? [{ level: "higher_secondary", institution: "", result: String(profile.academic.hscGpa), scale: "5.00", passingYear: "" }]
+                : []),
+            ],
       ielts: profile?.academic?.ielts ?? "",
       sat: profile?.academic?.sat ?? "",
       otherQualifications: profile?.academic?.otherQualifications ?? "",
@@ -87,6 +106,29 @@ function ProfileForm() {
     };
   });
   const set = (key) => (value) => setForm((f) => ({ ...f, [key]: value }));
+
+  const addAcademicRecord = () =>
+    setForm((f) => ({
+      ...f,
+      academicRecords: [
+        ...(f.academicRecords || []),
+        { level: "", institution: "", result: "", scale: "", passingYear: "" },
+      ],
+    }));
+
+  const updateAcademicRecord = (index, key, value) =>
+    setForm((f) => ({
+      ...f,
+      academicRecords: (f.academicRecords || []).map((record, i) =>
+        i === index ? { ...record, [key]: value } : record
+      ),
+    }));
+
+  const removeAcademicRecord = (index) =>
+    setForm((f) => ({
+      ...f,
+      academicRecords: (f.academicRecords || []).filter((_, i) => i !== index),
+    }));
 
   const toggleCountry = (id) =>
     setForm((f) => ({
@@ -141,7 +183,16 @@ function ProfileForm() {
           email: user.email || "",
           photoURL,
           academic: {
-            sscGpa: form.sscGpa, hscGpa: form.hscGpa, ielts: form.ielts, sat: form.sat,
+            records: (form.academicRecords || [])
+              .map((record) => ({
+                level: record.level || "",
+                institution: (record.institution || "").trim(),
+                result: (record.result || "").trim(),
+                scale: (record.scale || "").trim(),
+                passingYear: (record.passingYear || "").trim(),
+              }))
+              .filter((record) => record.level || record.institution || record.result || record.scale || record.passingYear),
+            ielts: form.ielts, sat: form.sat,
             otherQualifications: form.otherQualifications,
           },
           study: {
@@ -239,20 +290,50 @@ function ProfileForm() {
       )}
 
       {step === 1 && (
-        <Section icon={GraduationCap} tone="orange" title="Academics" subtitle="Fill in what you have. You can leave the rest empty for now.">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Input label="SSC GPA" value={form.sscGpa} onChange={set("sscGpa")} placeholder="e.g. 5.00" inputMode="decimal" />
-            <Input label="HSC GPA" value={form.hscGpa} onChange={set("hscGpa")} placeholder="e.g. 5.00" inputMode="decimal" />
+        <Section icon={GraduationCap} tone="orange" title="Academics" subtitle="Add only the academic records that apply to you. This works for school, bachelor's, master's and PhD applicants.">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h3 className="font-display font-bold text-ink">Academic records</h3>
+              <p className="mt-1 text-xs text-ink-faint">Add SSC/HSC, O/A Levels, Diploma, Bachelor's, Master's or any equivalent qualification.</p>
+            </div>
+            <button type="button" onClick={addAcademicRecord} className="btn btn-ghost btn-sm">
+              + Add record
+            </button>
+          </div>
+
+          <div className="mt-4 space-y-4">
+            {(form.academicRecords || []).length === 0 && (
+              <div className="rounded-2xl border border-dashed border-orange-200 bg-orange-50/60 p-5 text-center">
+                <p className="text-sm font-bold text-ink">No academic record added yet</p>
+                <p className="mt-1 text-xs text-ink-faint">Use “Add record” to add the qualifications relevant to you.</p>
+              </div>
+            )}
+
+            {(form.academicRecords || []).map((record, index) => (
+              <div key={index} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <p className="text-sm font-bold text-ink">Academic record {index + 1}</p>
+                  <button type="button" onClick={() => removeAcademicRecord(index)} className="text-xs font-bold text-red-600 hover:underline">
+                    Remove
+                  </button>
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Select label="Level" value={record.level || ""} onChange={(value) => updateAcademicRecord(index, "level", value)} options={ACADEMIC_LEVELS} placeholder="Choose level" />
+                  <Input label="Institution" value={record.institution || ""} onChange={(value) => updateAcademicRecord(index, "institution", value)} placeholder="School, college or university" />
+                  <Input label="Result / GPA / CGPA" value={record.result || ""} onChange={(value) => updateAcademicRecord(index, "result", value)} placeholder="e.g. 4.42 or 3.75" inputMode="decimal" />
+                  <Input label="Scale / Maximum" value={record.scale || ""} onChange={(value) => updateAcademicRecord(index, "scale", value)} placeholder="e.g. 5.00, 4.00, 10.00 or 100" />
+                  <Input label="Passing year" value={record.passingYear || ""} onChange={(value) => updateAcademicRecord(index, "passingYear", value)} placeholder="e.g. 2024" inputMode="numeric" />
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-6 grid gap-4 sm:grid-cols-2">
             <Input label="IELTS" value={form.ielts} onChange={set("ielts")} placeholder="Overall band, e.g. 7.0" />
             <Input label="SAT" value={form.sat} onChange={set("sat")} placeholder="Score, e.g. 1350" />
           </div>
-          <Textarea
-            className="mt-4"
-            label="Other qualifications"
-            value={form.otherQualifications}
-            onChange={set("otherQualifications")}
-            placeholder="Olympiads, certificates, GRE / GMAT, projects, work experience..."
-          />
+          <Textarea className="mt-4" label="Other qualifications" value={form.otherQualifications} onChange={set("otherQualifications")} placeholder="TOEFL, PTE, GRE / GMAT, olympiads, certificates, projects, work experience..." />
         </Section>
       )}
 
