@@ -3,9 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
+import { collection, doc, getDocs, onSnapshot, serverTimestamp, setDoc, writeBatch } from "firebase/firestore";
 import {
-  ArrowLeft, Check, ClipboardList, Coins, GraduationCap, Landmark, Languages, NotebookPen, Plane, Plus, Table2, Wallet,
+  ArrowLeft, Check, ClipboardList, Coins, GraduationCap, Landmark, Languages, NotebookPen, Plane, Plus, Share2, Table2, Wallet,
 } from "lucide-react";
 import PageShell from "@/components/PageShell";
 import Flag from "@/components/Flag";
@@ -13,6 +13,7 @@ import { EmptyState, ProgressRing, StatusBadge } from "@/components/ui";
 import { useAuth } from "@/lib/auth-context";
 import { useUserCollection } from "@/lib/hooks";
 import { CHECKLIST, computeProgress, ensureCountry, userSubDoc } from "@/lib/db";
+import { db } from "@/lib/firebase";
 import { getCountry } from "@/data/countries";
 
 const INFO = [
@@ -31,7 +32,7 @@ const message = (p) =>
   : "Research complete. Time to plan your applications.";
 
 function Hub({ country }) {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const uid = user.uid;
   const countryRef = userSubDoc(uid, "countries", country.id);
 
@@ -41,6 +42,7 @@ function Hub({ country }) {
   const [checklist, setChecklist] = useState({});
   const [notes, setNotes] = useState("");
   const [saveState, setSaveState] = useState("idle"); // idle | saving | saved | error
+  const [publishState, setPublishState] = useState("idle"); // idle | publishing | published | error
   const notesLoaded = useRef(false);
   const timer = useRef(null);
   const pending = useRef(null);
@@ -101,6 +103,92 @@ function Hub({ country }) {
     }
   }
 
+  async function publishResearch() {
+    if (!myUnis.length) {
+      window.alert("Add at least one university before publishing your research.");
+      return;
+    }
+
+    const ok = window.confirm(
+      `Publish your ${country.name} university research to the Uddesho Community?\n\nYour profile, academic results, personal country notes, application tracker and documents will NOT be shared. University custom fields will be included.`
+    );
+    if (!ok) return;
+
+    setPublishState("publishing");
+    try {
+      const researchId = `${uid}_${country.id}`;
+      const publicRef = doc(db, "publicResearch", researchId);
+      const existing = await getDocs(collection(publicRef, "universities"));
+      const batch = writeBatch(db);
+
+      // Remove the previous published university snapshot so re-publishing is always current.
+      existing.forEach((d) => batch.delete(d.ref));
+
+      const safeUniversity = (u) => ({
+        ownerUid: uid,
+        sourceUniversityId: u.id,
+        name: u.name || "",
+        city: u.city || "",
+        website: u.website || "",
+        ranking: u.ranking || "",
+        degree: u.degree || "",
+        subject: u.subject || "",
+        department: u.department || "",
+        language: u.language || "",
+        duration: u.duration || "",
+        gpaReq: u.gpaReq || "",
+        ielts: u.ielts || "",
+        sat: u.sat || "",
+        entranceExam: u.entranceExam || "",
+        currency: u.currency || "USD",
+        applicationFee: u.applicationFee || "",
+        tuitionFee: u.tuitionFee || "",
+        livingCost: u.livingCost || "",
+        scholarshipName: u.scholarshipName || "",
+        scholarshipAmount: u.scholarshipAmount || "",
+        scholarshipEligibility: u.scholarshipEligibility || "",
+        scholarshipDeadline: u.scholarshipDeadline || "",
+        customFields: Array.isArray(u.customFields) ? u.customFields : [],
+        countryId: country.id,
+        countryName: country.name,
+        countryCode: country.code,
+        updatedAt: serverTimestamp(),
+      });
+
+      batch.set(
+        publicRef,
+        {
+          ownerUid: uid,
+          countryId: country.id,
+          countryName: country.name,
+          countryCode: country.code,
+          title: `${country.name} Study Research`,
+          authorName: (profile?.name || user.displayName || "Uddesho Student").trim().split(/\s+/)[0],
+          anonymous: false,
+          allowCopy: true,
+          description: `${myUnis.length} university${myUnis.length === 1 ? "" : "ies"} researched for ${country.name}.`,
+          universityCount: myUnis.length,
+          copyCount: 0,
+          updatedAt: serverTimestamp(),
+          createdAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      myUnis.forEach((u) => {
+        batch.set(doc(publicRef, "universities", u.id), safeUniversity(u));
+      });
+
+      await batch.commit();
+      setPublishState("published");
+      window.alert("Published to Uddesho Community.");
+    } catch (e) {
+      console.error("Could not publish research", e);
+      setPublishState("error");
+      window.alert(`Could not publish: ${e?.message || "Unknown error"}`);
+    }
+  }
+
   const progress = computeProgress(checklist, myUnis.length);
   const base = `/research/${country.id}`;
 
@@ -123,6 +211,16 @@ function Hub({ country }) {
             <Link href={`${base}/universities`} className="btn btn-ghost">
               <Table2 className="h-4 w-4" /> University database
             </Link>
+            <button
+              type="button"
+              onClick={publishResearch}
+              disabled={publishState === "publishing" || myUnis.length === 0}
+              className="btn btn-success"
+              title={myUnis.length === 0 ? "Add a university first" : "Share university research with the Uddesho Community"}
+            >
+              <Share2 className="h-4 w-4" />
+              {publishState === "publishing" ? "Publishing..." : publishState === "published" ? "Published" : "Publish Research"}
+            </button>
           </div>
         </div>
         <div className="flex items-center gap-4 sm:flex-col sm:gap-1">
