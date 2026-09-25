@@ -4,32 +4,20 @@ import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  apiKey: "AIzaSyDCikWbA7LImXQROX0tjhM657kvP_rIWTw",
+  authDomain: "uddesho-c26ec.firebaseapp.com",
+  projectId: "uddesho-c26ec",
+  storageBucket: "uddesho-c26ec.firebasestorage.app",
+  messagingSenderId: "164957876871",
+  appId: "1:164957876871:web:348f88bca21dcec6c47e22",
 };
 
-// If the env vars are missing (for example on the very first deploy), the app shows a
-// friendly setup message instead of crashing.
-export const isFirebaseConfigured = Boolean(
-  firebaseConfig.apiKey && firebaseConfig.projectId && firebaseConfig.appId
-);
+export const isFirebaseConfigured = true;
 
-let app = null;
-let auth = null;
-let db = null;
-let storage = null;
-let googleProvider = null;
-
-if (isFirebaseConfigured) {
-  app = getApps().length ? getApp() : initializeApp(firebaseConfig);
-  auth = getAuth(app);
-  db = getFirestore(app);
-  storage = firebaseConfig.storageBucket ? getStorage(app) : null;
-  googleProvider = new GoogleAuthProvider();
-}
+const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const storage = getStorage(app);
+const googleProvider = new GoogleAuthProvider();
 
 export { app, auth, db, storage, googleProvider };
